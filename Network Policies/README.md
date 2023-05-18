@@ -1,5 +1,5 @@
 To apply this policy :
 
 ```bash
-kubectl apply -f namespace_network_isolation.yaml -n namespace
+kubectl apply -f NETWORK_POLICY_NAME.yaml -n NAMESPACE
 ```
