@@ -2,8 +2,11 @@ kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
   name: deny-other-namespaces-ingress
+  namespace: default
+# Selects the pods for which the rule will be applied ( in this case all pods of the namespace default) 
 spec:
   podSelector: {}
+  # Allow ingress traffic from all pods of the namespaces
   ingress:
   - from:
     - podSelector: {}
