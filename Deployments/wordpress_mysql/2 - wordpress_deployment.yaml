@@ -83,6 +83,18 @@ spec:
             secretKeyRef:
               name: secret-mysql-wordpress
               key: mysql-pass
+        # Restart if no response on port tcp for 10s
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          # Delay before check
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        # Do not expose service if no response within 5s
+        readinessProbe:
+          tcpSocket:
+            port: 80
+          periodSeconds: 5
         ports:
         - containerPort: 80
           name: wordpress
