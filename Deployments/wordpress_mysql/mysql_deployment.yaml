@@ -1,0 +1,123 @@
+# Env variable need to be set on terminal before apply
+# Then apply this file with this command to replace env variable in this deployment file : envsubst < mysql_deployment.yaml | kubectl apply -f -
+# To see if secret are ok : kubectl get secrets secret-mysql-wordpress --template='{{index .data "mysql-pass"}}' | base64 --decode
+
+# Secret for mysql image 
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-mysql-wordpress
+  labels:
+    app: wordpress
+type: Opaque
+stringData:
+  mysql-user: $DB_USER
+  mysql-pass: $DB_PASS
+  mysql-root-pass: $DB_ROOT_PASSWORD
+  mysql-database: $DB_NAME
+---
+# Network Service to allow communication between wordpress and mysql pod
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-mysql-service
+  labels:
+    app: wordpress
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: wordpress
+    tier: mysql
+  clusterIP: None
+---
+# Persistant volume for database data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+  labels:
+    app: wordpress
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Deployment of mysql image
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress-mysql
+  labels:
+    app: wordpress
+spec:
+  selector:
+    matchLabels:
+      app: wordpress
+      tier: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wordpress
+        tier: mysql
+    spec:
+      containers:
+      - image: mysql:5.7
+        # 1,5-2 Core CPU usage, AND 1024-2048Mi of RAM
+        resources:
+          requests:
+            memory: "1024Mi"
+            cpu: "1500m"
+          limits:
+            memory: "2048Mi"
+            cpu: "2000m"
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: secret-mysql-wordpress
+              key: mysql-root-pass
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: secret-mysql-wordpress
+              key: mysql-database
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: secret-mysql-wordpress
+              key: mysql-user
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: secret-mysql-wordpress
+              key: mysql-pass
+        # Restart if no response on port tcp for 120s
+        livenessProbe:
+          tcpSocket:
+            port: 3306
+          # Delay before check
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 12
+        # Do not expose service if no response within 10s
+        readinessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
